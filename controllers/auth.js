@@ -19,7 +19,6 @@ const crearUsuario = async (req, res = response) => {
 
     const usuario = new Usuario(req.body);
 
-    // Encriptar contraseña
     const salt = bcrypt.genSaltSync();
     usuario.password = bcrypt.hashSync(password, salt);
     usuario.tokenApp = tokenApp;
