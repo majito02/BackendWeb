@@ -310,28 +310,34 @@ const obtenerReporteBarras = async (req, res) => {
       publicaciones = documentosHoraInicio
     }
 
-    const conteoPorMes = {};
-    for (let index = (new Date(parametrosBusqueda.fechaInicio).getMonth()); index <= ((new Date(parametrosBusqueda.fechaFin).getMonth())); index++) {
-      conteoPorMes[index] = 0;
+    const conteoPorDia = {};
 
+    // Crear un rango de días dentro de la fecha de inicio y fin
+    const fechaInicio = new Date(parametrosBusqueda.fechaInicio);
+    const fechaFin = new Date(parametrosBusqueda.fechaFin);
+    const diaActual = new Date(fechaInicio);
+    
+    while (diaActual <= fechaFin) {
+      const dia = diaActual.toISOString().substr(0, 10);
+      conteoPorDia[dia] = 0;
+      diaActual.setDate(diaActual.getDate() + 1); // Avanzar al siguiente día
     }
-
-
+    
+    // Iterar a través de las publicaciones y actualizar el conteo por día
     publicaciones.forEach(publicacion => {
       const fecha = new Date(publicacion.createdAt);
-      const mes = fecha.getMonth() + 1; // Los meses en JavaScript se representan del 0 al 11, por eso sumamos 1.
-
-      if (conteoPorMes[mes]) {
-        conteoPorMes[mes]++;
-      } else {
-        conteoPorMes[mes] = 1;
+      const dia = fecha.toISOString().substr(0, 10);
+    
+      if (conteoPorDia[dia] !== undefined) {
+        conteoPorDia[dia]++;
       }
     });
+    
 
     res.json({
       ok: true,
       msg: "Datos para barras obtenidas correctamente",
-      data: conteoPorMes
+      data: conteoPorDia
     });
   } catch (error) {
     console.log(error);
@@ -477,7 +483,7 @@ const obtenerMapaCalor = async (req, res) => {
     }
 
 
-    const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const diasSemana = [ 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado','Domingo'];
     const heatmapData = Array.from({
       length: 7
     }, () => ({
@@ -498,6 +504,57 @@ const obtenerMapaCalor = async (req, res) => {
       heatmapData[diaSemana].data[hora] += 1;
     });
 
+    const tooltip = Array.from({
+      length: 7
+    }, (_, index) => ({
+      name: diasSemana[index],
+      data: Array(24).fill(null).map(() => ({}))
+    }));
+    
+    publicaciones.forEach((publicacion) => {
+      const fecha = new Date(publicacion.createdAt);
+      const diaSemana = fecha.getDay();
+      const hora = fecha.getHours();
+      const tituloEmergencia = publicacion.titulo;
+    
+      tooltip[diaSemana].data[hora][tituloEmergencia] = (tooltip[diaSemana].data[hora][tituloEmergencia] || 0) + 1;
+    });
+    const tooltiptime = Array.from({
+      length: 7
+    }, (_, index) => ({
+      name: diasSemana[index],
+      data: Array(24).fill(null).map(() => ({
+        fechaMinima: new Date(), // Inicializa con una fecha futura
+        fechaMaxima: new Date(0), // Inicializa con una fecha pasada
+      }))
+    }));
+
+    
+    publicaciones.forEach((publicacion) => {
+      const fecha = new Date(publicacion.createdAt);
+      const diaSemana = fecha.getDay();
+      const hora = fecha.getHours();
+      const tituloEmergencia = publicacion.titulo;
+    
+      const horaData = tooltiptime[diaSemana].data[hora];
+      horaData[tituloEmergencia] = (horaData[tituloEmergencia] || 0) + 1;
+    
+      if (fecha < horaData.fechaMinima) {
+        horaData.fechaMinima = fecha;
+      }
+      if (fecha > horaData.fechaMaxima) {
+        horaData.fechaMaxima = fecha;
+      }
+    });
+    
+    // Formatear las fechas en un formato legible
+    tooltiptime.forEach((dia) => {
+      dia.data.forEach((horaData) => {
+        horaData.fechaMinima = horaData.fechaMinima.toLocaleString();
+        horaData.fechaMaxima = horaData.fechaMaxima.toLocaleString();
+      });
+    });
+    
     let maxCount = 0;
 
     heatmapData.forEach((data, index) => {
@@ -511,7 +568,7 @@ const obtenerMapaCalor = async (req, res) => {
         from: 1,
         to: segmentSize,
         name: 'Bajo',
-        color: '#008FFB'
+        color: '#A1D7C9'
       },
       {
         from: segmentSize + 1,
@@ -534,6 +591,8 @@ const obtenerMapaCalor = async (req, res) => {
       data: {
         heatmapData,
         ranges,
+        tooltip,
+        tooltiptime,
         total: publicaciones.length
       }
     });
@@ -788,7 +847,7 @@ const descargarPDF = async (req, res) => {
   let consulta = {};
   try {
     const parametrosBusqueda = req.body;
-    console.log(parametrosBusqueda);
+
     Object.keys(parametrosBusqueda).forEach(key => {
       if (parametrosBusqueda[key] !== '' && parametrosBusqueda[key] !== undefined) {
         consulta[key] = parametrosBusqueda[key];

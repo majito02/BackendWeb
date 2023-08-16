@@ -23,6 +23,7 @@
     "jsonwebtoken": "^8.5.1",
     "lodash": "^4.17.21",
     "mongoose": "^6.6.5",
+    "nodemailer": "^6.9.4",
     "pdfmake": "^0.2.7",
     "pdfmake-unicode": "^0.0.1",
     "socket.io": "^4.7.1",
